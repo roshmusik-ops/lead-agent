@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import os
+import re
 import smtplib
 import ssl
 import time
+from urllib.parse import quote
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -16,6 +18,15 @@ from dotenv import load_dotenv
 from config import BRAND, CATEGORIES, KERALA_CITIES
 
 load_dotenv()
+
+# Streamlit Cloud: pull secrets from st.secrets into env vars
+try:
+    for _k in ("GMAIL_USER", "GMAIL_APP_PASSWORD", "GEMINI_API_KEY"):
+        if _k in st.secrets and not os.getenv(_k):
+            os.environ[_k] = st.secrets[_k]
+except Exception:
+    pass
+
 DATA_DIR = Path(__file__).parent / "data"
 LEADS_CSV = DATA_DIR / "leads.csv"
 PITCHES_CSV = DATA_DIR / "pitches.csv"
@@ -25,7 +36,25 @@ st.set_page_config(page_title="Rosh Creatives — Lead Agent", layout="wide")
 st.title("🎬 Rosh Creatives — Lead Agent")
 st.caption(f"{BRAND['founder']} · {BRAND['phone']} · {BRAND['email']} · {BRAND['website']}")
 
-tab1, tab2, tab3 = st.tabs(["📋 Leads", "✍️ Pitches", "✉️ Outreach"])
+tab1, tab2, tab3, tab4 = st.tabs(["📋 Leads", "✍️ Pitches", "✉️ Email Outreach", "💬 WhatsApp"])
+
+
+def clean_phone(phone: str) -> str:
+    """Convert messy phone (e.g. '0484 403 3350', '+91 ...') to wa.me-friendly format."""
+    if not phone:
+        return ""
+    digits = re.sub(r"\D", "", str(phone))
+    if not digits:
+        return ""
+    if digits.startswith("91") and len(digits) >= 12:
+        return digits[:12]
+    if digits.startswith("0") and len(digits) == 11:
+        return "91" + digits[1:]
+    if len(digits) == 10:
+        return "91" + digits
+    if digits.startswith("91"):
+        return digits
+    return digits
 
 
 def load_csv(path: Path) -> pd.DataFrame:
@@ -63,6 +92,7 @@ with tab2:
         st.dataframe(df, use_container_width=True, hide_index=True)
 
 with tab3:
+    st.markdown("### ✉️ Email outreach")
     if not OUTREACH_CSV.exists():
         st.info("Build outreach list first: `python outreach.py --build`")
     else:
@@ -125,3 +155,55 @@ with tab3:
                     smtp.quit()
                 edited.to_csv(OUTREACH_CSV, index=False)
                 st.success("Done. Refresh to see updated statuses.")
+
+with tab4:
+    st.markdown("### 💬 WhatsApp click-to-chat")
+    st.caption("Tap a link to open WhatsApp with a personalized opener pre-filled. Sends from YOUR number, fully manual — no spam risk.")
+    leads_df = load_csv(LEADS_CSV)
+    pitches_df = load_csv(PITCHES_CSV)
+    if leads_df.empty:
+        st.info("No leads yet.")
+    else:
+        # join pitches by name+city
+        pmap = {}
+        if not pitches_df.empty:
+            for _, p in pitches_df.iterrows():
+                pmap[(p["name"], p["city"])] = p
+
+        c1, c2 = st.columns(2)
+        cats = ["(all)"] + sorted(leads_df["category"].dropna().unique().tolist())
+        cities = ["(all)"] + sorted(leads_df["city"].dropna().unique().tolist())
+        f_cat = c1.selectbox("Category ", cats, key="wa_cat")
+        f_city = c2.selectbox("City ", cities, key="wa_city")
+
+        view = leads_df.copy()
+        if f_cat != "(all)": view = view[view["category"] == f_cat]
+        if f_city != "(all)": view = view[view["city"] == f_city]
+        view = view[view["phone"].astype(str).str.len() > 3]
+        st.write(f"**{len(view)}** leads with phone numbers")
+
+        for _, r in view.head(50).iterrows():
+            wa = clean_phone(r.get("phone", ""))
+            if not wa:
+                continue
+            p = pmap.get((r["name"], r["city"]))
+            if p is not None:
+                opener = (
+                    f"Hi! I'm {BRAND['founder']} from {BRAND['company']}. "
+                    f"Loved your work at {r['name']}. We've made ads for "
+                    f"{', '.join(BRAND['past_work'])} and have a fresh idea for your brand. "
+                    f"Free for a 10-min chat this week?"
+                )
+            else:
+                opener = (
+                    f"Hi! I'm {BRAND['founder']} from {BRAND['company']} — we make video ads & jingles "
+                    f"(past work: {', '.join(BRAND['past_work'])}). "
+                    f"Have a creative idea for {r['name']}. Free for a quick chat?"
+                )
+            link = f"https://wa.me/{wa}?text={quote(opener)}"
+            with st.container(border=True):
+                cc1, cc2 = st.columns([3, 1])
+                cc1.markdown(f"**{r['name']}** · _{r['category']}, {r['city']}_")
+                cc1.caption(r.get("address", ""))
+                cc1.caption(f"☎️ {r.get('phone','')}  ⭐ {r.get('rating','')} ({r.get('reviews','')} reviews)")
+                cc2.link_button("💬 WhatsApp", link, use_container_width=True)

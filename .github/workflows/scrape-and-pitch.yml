@@ -68,6 +68,10 @@ jobs:
         run: |
           python scraper.py --category "${{ steps.job.outputs.category }}" --city "${{ steps.job.outputs.city }}" --limit ${{ github.event.inputs.limit || '25' }}
 
+      - name: Enrich emails
+        run: |
+          python enricher.py --limit 30
+
       - name: Pitch new leads
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
