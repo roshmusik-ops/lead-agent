@@ -88,19 +88,23 @@ def save_pitches(rows: list[dict]):
 
 
 def parse_output(text: str) -> tuple[str, str]:
+    import re as _re
     subject = ""
     body = ""
-    if "SUBJECT:" in text:
-        rest = text.split("SUBJECT:", 1)[1]
-        if "BODY:" in rest:
-            subject_part, body_part = rest.split("BODY:", 1)
-            subject = subject_part.strip().splitlines()[0].strip()
-            body = body_part.strip()
+    norm = _re.sub(r"\*+", "", text)
+    m = _re.search(r"(?im)^\s*subject\s*:\s*(.+)$", norm)
+    b = _re.search(r"(?im)^\s*body\s*:\s*$", norm)
+    if m:
+        subject = m.group(1).strip()
+    if b:
+        body = norm[b.end():].strip()
     if not subject or not body:
-        # fallback: first line subject, rest body
-        lines = text.strip().splitlines()
-        subject = lines[0][:90] if lines else "A quick idea for your brand"
-        body = "\n".join(lines[1:]).strip() or text.strip()
+        lines = norm.strip().splitlines()
+        if not subject:
+            subject = (lines[0] if lines else "A quick note").strip()
+        if not body:
+            body = "\n".join(lines[1:]).strip() or norm.strip()
+    subject = _re.sub(r"(?i)^\s*subject\s*:\s*", "", subject).strip()[:140]
     return subject, body
 
 
@@ -108,7 +112,7 @@ def build_user_prompt(lead: dict) -> str:
     return (
         f"Business: {lead.get('name','')}\n"
         f"Category: {lead.get('category','')}\n"
-        f"City: {lead.get('city','')}, Kerala\n"
+        f"City: {lead.get('city','')}\n"
         f"Address: {lead.get('address','')}\n"
         f"Rating: {lead.get('rating','')} ({lead.get('reviews','')} reviews)\n"
         f"Website: {lead.get('website','')}\n\n"
