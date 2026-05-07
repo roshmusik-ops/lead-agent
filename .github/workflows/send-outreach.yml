@@ -1,16 +1,23 @@
-name: Send Approved Outreach
+name: Draft Approved Outreach
 
 on:
+  schedule:
+    # 10:00 IST = 04:30 UTC, weekdays only (Mon-Fri)
+    - cron: "30 4 * * 1-5"
   workflow_dispatch:
     inputs:
       limit:
         description: "Max emails to send this run"
         required: false
         default: "20"
-      dry_run:
-        description: "Dry run? (true/false)"
+      mode:
+        description: "draft (save to Gmail Drafts) or send (send directly)"
         required: false
-        default: "true"
+        default: "draft"
+      dry_run:
+        description: "Dry run? (only used in send mode)"
+        required: false
+        default: "false"
 
 permissions:
   contents: write
@@ -30,15 +37,23 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      - name: Send approved emails
+      - name: Draft / send approved emails
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          MODE: ${{ github.event.inputs.mode }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          LIMIT: ${{ github.event.inputs.limit }}
         run: |
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-            python outreach.py --send --dry-run --limit ${{ github.event.inputs.limit }}
+          # Default for scheduled runs: draft mode (safe), 20/day
+          M="${MODE:-draft}"
+          LIM="${LIMIT:-20}"
+          if [ "$M" = "draft" ]; then
+            python outreach.py --draft --limit $LIM
+          elif [ "${DRY_RUN:-false}" = "true" ]; then
+            python outreach.py --send --dry-run --limit $LIM
           else
-            python outreach.py --send --limit ${{ github.event.inputs.limit }}
+            python outreach.py --send --limit $LIM
           fi
 
       - name: Commit log

@@ -7,12 +7,14 @@ from __future__ import annotations
 
 import argparse
 import csv
+import imaplib
 import os
 import smtplib
 import ssl
 import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formatdate
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -133,10 +135,61 @@ def send_all(dry_run: bool = False, limit: int = 0):
     print("✓ outreach.csv updated.")
 
 
+def draft_all(limit: int = 0):
+    """Save approved emails as Gmail Drafts via IMAP — you review and send manually."""
+    user = os.getenv("GMAIL_USER")
+    pwd = os.getenv("GMAIL_APP_PASSWORD")
+    if not user or not pwd:
+        raise SystemExit("GMAIL_USER / GMAIL_APP_PASSWORD missing in .env")
+
+    if not OUTREACH_CSV.exists():
+        build_outreach_csv()
+
+    rows = list(csv.DictReader(OUTREACH_CSV.open(encoding="utf-8")))
+    todo = [r for r in rows
+            if r["approved"].lower() == "yes"
+            and r["email"] and not r["sent_at"]
+            and r.get("status", "") != "drafted"]
+    if limit:
+        todo = todo[:limit]
+    print(f"Drafting {len(todo)} approved emails to Gmail Drafts...")
+    if not todo:
+        return
+
+    imap = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+    imap.login(user, pwd)
+    drafts_box = '"[Gmail]/Drafts"'
+
+    for r in todo:
+        try:
+            msg = MIMEMultipart()
+            msg["From"] = f"{BRAND['founder']} <{user}>"
+            msg["To"] = r["email"]
+            msg["Subject"] = r["email_subject"]
+            msg["Date"] = formatdate(localtime=True)
+            msg.attach(MIMEText(r["email_body"], "plain", "utf-8"))
+            raw = msg.as_bytes()
+            imap.append(drafts_box, r"(\Draft)", imaplib.Time2Internaldate(time.time()), raw)
+            r["status"] = "drafted"
+            r["sent_at"] = time.strftime("%Y-%m-%d %H:%M") + " (draft)"
+            print(f"  ✓ {r['name']} <{r['email']}>")
+        except Exception as e:
+            r["status"] = f"draft-error: {e}"
+            print(f"  ✗ {r['name']}: {e}")
+
+    imap.logout()
+    with OUTREACH_CSV.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=FIELDS)
+        w.writeheader()
+        w.writerows(rows)
+    print("✓ Done. Open Gmail → Drafts to review and click Send.")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--build", action="store_true", help="Rebuild outreach.csv from pitches")
-    ap.add_argument("--send", action="store_true", help="Send approved emails")
+    ap.add_argument("--send", action="store_true", help="Send approved emails directly")
+    ap.add_argument("--draft", action="store_true", help="Save approved emails as Gmail drafts")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
     args = ap.parse_args()
@@ -145,7 +198,9 @@ def main():
         build_outreach_csv()
     if args.send:
         send_all(dry_run=args.dry_run, limit=args.limit)
-    if not (args.build or args.send):
+    if args.draft:
+        draft_all(limit=args.limit)
+    if not (args.build or args.send or args.draft):
         ap.print_help()
 
 

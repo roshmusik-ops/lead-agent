@@ -1,0 +1,53 @@
+name: Draft Replies to Incoming Email
+
+on:
+  schedule:
+    # Every weekday at 09:00 IST (03:30 UTC) and 17:00 IST (11:30 UTC)
+    - cron: "30 3 * * 1-5"
+    - cron: "30 11 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "How many days back to scan inbox"
+        required: false
+        default: "7"
+
+permissions:
+  contents: write
+
+jobs:
+  reply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Draft AI replies
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DAYS: ${{ github.event.inputs.days }}
+        run: |
+          python replier.py --days ${DAYS:-7}
+
+      - name: Commit log
+        run: |
+          git config user.name "lead-agent-bot"
+          git config user.email "bot@roshcreatives.local"
+          git add data/replies.csv 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "replies: auto-draft batch ($(date -u +%Y-%m-%d))"
+            git push
+          fi
