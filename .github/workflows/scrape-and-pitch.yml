@@ -45,7 +45,7 @@ jobs:
         run: |
           python - <<'PY'
           import os, datetime
-          from config import CATEGORIES, KERALA_CITIES
+          from config import CATEGORIES, ALL_CITIES as KERALA_CITIES
           mc = os.getenv("INPUT_CATEGORY") or ""
           mci = os.getenv("INPUT_CITY") or ""
           if mc and mci:

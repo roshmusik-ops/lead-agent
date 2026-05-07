@@ -16,7 +16,7 @@ from urllib.parse import quote_plus
 
 from playwright.sync_api import sync_playwright
 
-from config import CATEGORIES, KERALA_CITIES
+from config import CATEGORIES, ALL_CITIES
 
 DATA_DIR = Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -61,7 +61,15 @@ def append_leads(rows: list[dict]):
 
 
 def scrape(category: str, city: str, limit: int = 25, headless: bool = True) -> list[dict]:
-    query = f"{category} in {city}, Kerala"
+    state = "Tamil Nadu" if city in {
+        "Chennai","Coimbatore","Madurai","Tiruchirappalli","Salem","Tirunelveli","Tiruppur",
+        "Vellore","Erode","Thoothukudi","Dindigul","Thanjavur","Ranipet","Sivaganga","Karur",
+        "Namakkal","Kanchipuram","Tiruvannamalai","Pudukkottai","Nagapattinam","Cuddalore",
+        "Villupuram","Krishnagiri","Dharmapuri","Theni","Virudhunagar","Ramanathapuram",
+        "Kanyakumari","Nilgiris","Ariyalur","Perambalur","Tenkasi","Chengalpattu","Tirupathur",
+        "Mayiladuthurai","Kallakurichi","Tiruvallur","Tiruvarur"
+    } else "Kerala"
+    query = f"{category} in {city}, {state}"
     url = f"https://www.google.com/maps/search/{quote_plus(query)}"
     results: list[dict] = []
 
@@ -169,7 +177,7 @@ def main():
 
     pairs = []
     if args.all:
-        pairs = [(c, city) for c in CATEGORIES for city in KERALA_CITIES]
+        pairs = [(c, city) for c in CATEGORIES for city in ALL_CITIES]
     elif args.category and args.city:
         pairs = [(args.category, args.city)]
     else:
