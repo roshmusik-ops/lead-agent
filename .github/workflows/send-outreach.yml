@@ -1,0 +1,54 @@
+name: Send Approved Outreach
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max emails to send this run"
+        required: false
+        default: "20"
+      dry_run:
+        description: "Dry run? (true/false)"
+        required: false
+        default: "true"
+
+permissions:
+  contents: write
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Send approved emails
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            python outreach.py --send --dry-run --limit ${{ github.event.inputs.limit }}
+          else
+            python outreach.py --send --limit ${{ github.event.inputs.limit }}
+          fi
+
+      - name: Commit log
+        run: |
+          git config user.name "lead-agent-bot"
+          git config user.email "bot@roshcreatives.local"
+          git add data/outreach.csv
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "outreach: send batch ($(date -u +%Y-%m-%d))"
+            git push
+          fi

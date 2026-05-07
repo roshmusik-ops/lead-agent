@@ -1,0 +1,91 @@
+name: Scrape & Pitch
+
+on:
+  schedule:
+    # Runs every day at 02:30 UTC (08:00 IST)
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+    inputs:
+      category:
+        description: "Category to scrape (e.g. 'jewellery shop'). Leave empty for daily rotation."
+        required: false
+        default: ""
+      city:
+        description: "City to scrape. Leave empty for daily rotation."
+        required: false
+        default: ""
+      limit:
+        description: "Max leads per query"
+        required: false
+        default: "25"
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Pick today's job
+        id: job
+        run: |
+          python - <<'PY'
+          import os, datetime
+          from config import CATEGORIES, KERALA_CITIES
+          mc = os.getenv("INPUT_CATEGORY") or ""
+          mci = os.getenv("INPUT_CITY") or ""
+          if mc and mci:
+              cat, city = mc, mci
+          else:
+              # rotate through (category, city) pairs by day-of-year
+              pairs = [(c, x) for c in CATEGORIES for x in KERALA_CITIES]
+              idx = datetime.date.today().toordinal() % len(pairs)
+              cat, city = pairs[idx]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"category={cat}\n")
+              f.write(f"city={city}\n")
+          print(f"Today: {cat} in {city}")
+          PY
+        env:
+          INPUT_CATEGORY: ${{ github.event.inputs.category }}
+          INPUT_CITY: ${{ github.event.inputs.city }}
+
+      - name: Scrape
+        run: |
+          python scraper.py --category "${{ steps.job.outputs.category }}" --city "${{ steps.job.outputs.city }}" --limit ${{ github.event.inputs.limit || '25' }}
+
+      - name: Pitch new leads
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python pitcher.py
+
+      - name: Build outreach queue
+        run: |
+          python outreach.py --build
+
+      - name: Commit data
+        run: |
+          git config user.name "lead-agent-bot"
+          git config user.email "bot@roshcreatives.local"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "data: ${{ steps.job.outputs.category }} in ${{ steps.job.outputs.city }} ($(date -u +%Y-%m-%d))"
+            git push
+          fi
