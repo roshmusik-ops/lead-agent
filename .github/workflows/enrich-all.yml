@@ -1,0 +1,58 @@
+name: Enrich All Emails
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max leads to enrich (0 = all)"
+        required: false
+        default: "0"
+
+permissions:
+  contents: write
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Enrich
+        run: |
+          if [ "${{ github.event.inputs.limit }}" = "0" ]; then
+            python enricher.py
+          else
+            python enricher.py --limit ${{ github.event.inputs.limit }}
+          fi
+
+      - name: Re-pitch leads (now with emails)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python pitcher.py
+
+      - name: Rebuild outreach queue
+        run: |
+          python outreach.py --build
+
+      - name: Commit
+        run: |
+          git config user.name "lead-agent-bot"
+          git config user.email "bot@roshcreatives.local"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "data: enrich emails ($(date -u +%Y-%m-%d))"
+            git push
+          fi
