@@ -20,18 +20,76 @@ BRAND = {
 }
 
 CATEGORIES = [
+    # Wedding & fashion
     "bridal lounge",
     "jewellery shop",
     "textile showroom",
     "saree showroom",
-    "ayurveda clinic",
-    "ayurvedic pharmacy",
+    "boutique",
+    "wedding photographer",
+    "wedding planner",
+    "event planner",
+    "catering service",
+    "wedding hall",
+    # Beauty & wellness
     "beauty salon",
     "spa",
-    "wedding photographer",
-    "event planner",
+    "ayurveda clinic",
+    "ayurvedic pharmacy",
+    "dental clinic",
+    "skin clinic",
+    "eye hospital",
+    "hospital",
+    "fitness gym",
+    "yoga studio",
+    # Food
     "restaurant",
-    "catering service",
+    "cafe",
+    "bakery",
+    "sweet shop",
+    "ice cream parlour",
+    "cloud kitchen",
+    # Education
+    "school",
+    "coaching centre",
+    "tuition centre",
+    "music school",
+    "dance school",
+    "driving school",
+    "computer training institute",
+    # Real estate & home
+    "real estate agency",
+    "builders",
+    "interior designer",
+    "furniture showroom",
+    "home appliances showroom",
+    "modular kitchen showroom",
+    # Auto
+    "car showroom",
+    "used car dealer",
+    "bike showroom",
+    "car service centre",
+    # Travel & hospitality
+    "hotel",
+    "resort",
+    "homestay",
+    "travel agency",
+    "tour operator",
+    # Retail
+    "electronics shop",
+    "mobile shop",
+    "supermarket",
+    "optical shop",
+    "footwear store",
+    "kids store",
+    "pet shop",
+    # Services
+    "photography studio",
+    "printing press",
+    "advertising signboard",
+    "courier service",
+    "packers and movers",
+    "veterinary clinic",
 ]
 
 KERALA_CITIES = [
