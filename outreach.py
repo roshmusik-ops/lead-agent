@@ -26,6 +26,20 @@ DATA_DIR = Path(__file__).parent / "data"
 LEADS_CSV = DATA_DIR / "leads.csv"
 PITCHES_CSV = DATA_DIR / "pitches.csv"
 OUTREACH_CSV = DATA_DIR / "outreach.csv"
+DNC_CSV = DATA_DIR / "do_not_contact.csv"
+
+
+def load_dnc() -> set:
+    if not DNC_CSV.exists():
+        return set()
+    out = set()
+    with DNC_CSV.open(encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            e = r.get("email", "").lower().strip()
+            if e:
+                out.add(e)
+    return out
+
 
 FIELDS = [
     "name", "city", "category", "email", "email_subject", "email_body",
@@ -99,7 +113,14 @@ def send_all(dry_run: bool = False, limit: int = 0):
         build_outreach_csv()
 
     rows = list(csv.DictReader(OUTREACH_CSV.open(encoding="utf-8")))
-    todo = [r for r in rows if r["approved"].lower() == "yes" and r["email"] and not r["sent_at"]]
+    dnc = load_dnc()
+    todo = [
+        r for r in rows
+        if r["approved"].lower() == "yes"
+        and r["email"]
+        and r["email"].lower() not in dnc
+        and not r["sent_at"]
+    ]
     if limit:
         todo = todo[:limit]
 
@@ -185,9 +206,37 @@ def draft_all(limit: int = 0):
     print("✓ Done. Open Gmail → Drafts to review and click Send.")
 
 
+def auto_approve(limit: int = 0):
+    """Auto-approve pending rows (used by autonomous agent). Skips DNC and already-sent."""
+    if not OUTREACH_CSV.exists():
+        build_outreach_csv()
+    rows = list(csv.DictReader(OUTREACH_CSV.open(encoding="utf-8")))
+    dnc = load_dnc()
+    approved = 0
+    for r in rows:
+        if approved >= limit > 0:
+            break
+        if r["approved"].lower() == "yes":
+            continue
+        if not r.get("email"):
+            continue
+        if r["email"].lower() in dnc:
+            continue
+        if r.get("sent_at"):
+            continue
+        r["approved"] = "yes"
+        approved += 1
+    with OUTREACH_CSV.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=FIELDS)
+        w.writeheader()
+        w.writerows(rows)
+    print(f"Auto-approved {approved} rows.")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--build", action="store_true", help="Rebuild outreach.csv from pitches")
+    ap.add_argument("--auto-approve", action="store_true", help="Auto-approve pending rows up to --limit")
     ap.add_argument("--send", action="store_true", help="Send approved emails directly")
     ap.add_argument("--draft", action="store_true", help="Save approved emails as Gmail drafts")
     ap.add_argument("--dry-run", action="store_true")
@@ -196,11 +245,13 @@ def main():
 
     if args.build:
         build_outreach_csv()
+    if args.auto_approve:
+        auto_approve(limit=args.limit)
     if args.send:
         send_all(dry_run=args.dry_run, limit=args.limit)
     if args.draft:
         draft_all(limit=args.limit)
-    if not (args.build or args.send or args.draft):
+    if not (args.build or args.send or args.draft or args.auto_approve):
         ap.print_help()
 
 

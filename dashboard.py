@@ -189,16 +189,30 @@ with tab4:
             p = pmap.get((r["name"], r["city"]))
             if p is not None:
                 opener = (
-                    f"Hi! I'm {BRAND['founder']} from {BRAND['company']}. "
-                    f"Loved your work at {r['name']}. We've made ads for "
-                    f"{', '.join(BRAND['past_work'])} and have a fresh idea for your brand. "
-                    f"Free for a 10-min chat this week?"
+                    f"Hello {r['name']} Team,\n\n"
+                    f"I'm {BRAND['founder']}, founder of {BRAND['company']} — a creative studio "
+                    f"specialising in video advertisements, radio jingles and social media reels. "
+                    f"Our recent work includes {', '.join(BRAND['past_work'])}.\n\n"
+                    f"I came across your business in {r['city']} and have a fresh campaign idea "
+                    f"tailored to your brand. Would you be open to a brief 10-minute call this week "
+                    f"to explore it?\n\n"
+                    f"Portfolio: {BRAND['website']}\n\n"
+                    f"Warm regards,\n"
+                    f"{BRAND['founder']}\n"
+                    f"{BRAND['company']} · {BRAND['phone']}"
                 )
             else:
                 opener = (
-                    f"Hi! I'm {BRAND['founder']} from {BRAND['company']} — we make video ads & jingles "
-                    f"(past work: {', '.join(BRAND['past_work'])}). "
-                    f"Have a creative idea for {r['name']}. Free for a quick chat?"
+                    f"Hello {r['name']} Team,\n\n"
+                    f"I'm {BRAND['founder']}, founder of {BRAND['company']}. We craft video ads, "
+                    f"radio jingles and social media reels for growing brands "
+                    f"(recent work: {', '.join(BRAND['past_work'])}).\n\n"
+                    f"I'd love to share a creative concept tailored for {r['name']}. "
+                    f"Could we connect for a quick 10-minute call this week?\n\n"
+                    f"Portfolio: {BRAND['website']}\n\n"
+                    f"Warm regards,\n"
+                    f"{BRAND['founder']}\n"
+                    f"{BRAND['company']} · {BRAND['phone']}"
                 )
             link = f"https://wa.me/{wa}?text={quote(opener)}"
             with st.container(border=True):

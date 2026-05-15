@@ -3,7 +3,7 @@
 BRAND = {
     "company": "Rosh Creatives",
     "founder": "Roshith R Menon",
-    "phone": "+91 70121 15365",
+    "phone": "+91 94473 36560",
     "email": "rosh.musik@gmail.com",
     "website": "https://www.roshmusik.com",
     "tagline": "Ads that sing.",
@@ -16,6 +16,28 @@ BRAND = {
         "Radio jingles & audio ads",
         "Social media reels",
         "Brand sound design",
+    ],
+    "booking_link": "",
+}
+
+# Autonomous agent settings (Level B: auto-send routine replies, draft complex ones).
+AGENT = {
+    "max_pitches_per_day": 40,
+    "max_auto_replies_per_day": 80,
+    "seconds_between_sends": 12,
+    "auto_send_intents": [
+        "interested",
+        "wants_info",
+        "wants_price",
+        "not_interested",
+        "unsubscribe",
+        "out_of_office",
+    ],
+    "always_draft_intents": [
+        "complex",
+        "complaint",
+        "angry",
+        "legal",
     ],
 }
 

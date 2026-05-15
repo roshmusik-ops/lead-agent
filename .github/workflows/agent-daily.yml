@@ -1,0 +1,52 @@
+name: Rosh Creatives Agent (daily)
+
+on:
+  schedule:
+    # 09:00 IST = 03:30 UTC. Runs every weekday morning.
+    - cron: "30 3 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (don't actually send)"
+        type: boolean
+        default: false
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run daily agent
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          PYTHONIOENCODING: utf-8
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python agent.py --dry-run
+          else
+            python agent.py
+          fi
+
+      - name: Commit CSV updates
+        run: |
+          git config user.name "Rosh Agent Bot"
+          git config user.email "bot@roshcreatives.local"
+          git add data/pitches.csv data/outreach.csv data/replies.csv data/agent_log.csv data/do_not_contact.csv 2>/dev/null || true
+          if ! git diff --staged --quiet; then
+            git commit -m "agent: daily run $(date -u +%F)"
+            git push
+          fi
